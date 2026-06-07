@@ -13,15 +13,16 @@ an SDEdit-style initialization. The prior is never retrained.
 
 At every reverse step the shape latent $w$ is re-solved on
 
-$$
-J_t(w) = \mathrm{softNLL}(b; \hat{x}_0(X_t,t,F_\alpha(w)))
-+ \frac{1}{2}\|w - \mu_t\|_2^2
-$$
-
-$$
-\mu_t = \mathrm{sg}[F_\alpha^{-1}(E_\phi(\hat{x}_0))]
-\quad \text{(encoder-consistency anchor)}
-$$
+```math
+\begin{aligned}
+J_t(w)
+&= \mathrm{softNLL}(b; \hat{x}_0(X_t,t,F_\alpha(w)))
+   + \frac{1}{2}\|w - \mu_t\|_2^2 \\
+\mu_t
+&= \mathrm{sg}[F_\alpha^{-1}(E_\phi(\hat{x}_0))]
+   \quad \text{(encoder-consistency anchor)}
+\end{aligned}
+```
 
 and the points are updated with the resulting measurement-guided posterior
 score. Evaluated here on ShapeNet airplane Gaussian denoising.
@@ -50,10 +51,10 @@ src/
 │   ├── paper_style.py      # matplotlib style for the paper figures
 │   ├── run_main_results.py # Experiment 1: Table 1 (all policies, all noise levels)
 │   ├── run_main_results.sh
-│   ├── run_mechanism.py    # Experiment 2: Fig. 3 (latent-quality vs reverse step)
+│   ├── run_mechanism.py    # Experiment 2: Fig. 2 (latent-quality vs reverse step)
 │   ├── run_mechanism.sh
-│   ├── plot_main_grid.py   # renders the qualitative grid (Fig. 2)
-│   └── plot_mechanism.py   # renders the mechanism plot (Fig. 3)
+│   ├── plot_main_grid.py   # renders the qualitative grid (Fig. 1)
+│   └── plot_mechanism.py   # renders the mechanism plot (Fig. 2)
 ├── pretrained/             # place GEN_airplane.pt here (not tracked)
 ├── data/                   # place shapenet.hdf5 here (not tracked)
 ├── output/                 # experiment outputs (created at run time, not tracked)
@@ -81,7 +82,7 @@ All commands below are run **from `src/`**.
 
 ## Reproduce the paper
 
-### Experiment 1 — main results (Table 1 + Fig. 2)
+### Experiment 1 — main results (Table 1 + Fig. 1)
 
 ```bash
 bash experiments/run_main_results.sh
@@ -104,7 +105,7 @@ budget-matched to Ours**: it spends the same total number of optimization steps
 $K_w t'$, but all at once at $t'$ and then freezes — so the One-shot+DPS vs
 Ours gap isolates *when* the latent is optimized.
 
-Then render the qualitative grid (Fig. 2):
+Then render the qualitative grid (Fig. 1):
 
 ```bash
 python experiments/plot_main_grid.py --exp_dir output/main_results --policies ours,winv_dps,enc_dps
@@ -117,7 +118,7 @@ Defaults reproduce the paper: airplane, $K_w=25$, $t'=30$, noise $\{0.1,0.2,0.3\
 NUM_SHAPES=0 bash experiments/run_main_results.sh
 ```
 
-### Experiment 2 — mechanism (Fig. 3)
+### Experiment 2 — mechanism (Fig. 2)
 
 ```bash
 bash experiments/run_mechanism.sh
