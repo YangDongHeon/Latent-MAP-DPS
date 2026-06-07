@@ -1,7 +1,7 @@
 """Paper-style mechanism figure (Fig. 2) from exp10 result.json.
 
 Reads <exp_dir>/result.json -- curves of decode(w_t) Chamfer-to-GT vs reverse step
-for OURS (per-step latent) vs the one-shot Inversion+DPS latent -- and renders a clean
+for OURS (per-step latent) vs the one-shot One-shot+DPS latent -- and renders a clean
 vector figure. Torch-free (matplotlib only); re-style without re-running exp10.
 
 One noise  -> single compact single-column panel (recommended for the paper; pick the

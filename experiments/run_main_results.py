@@ -6,8 +6,8 @@ default 'all'); paper-figure column names in [brackets]:
 
     enc_no_dps  : w=E_phi(b) frozen,     reverse chain, no DPS          [Encoder]
     enc_dps     : w=E_phi(b) frozen,     reverse chain + DPS-on-x       [Encoder+DPS]
-    w_inv       : w_obs -> solve J_t' ONCE at t' (invert_iters), freeze [Inversion]
-    winv_dps    : w_inv + DPS (z FIXED for the whole chain)             [Inversion+DPS]
+    oneshot       : w_obs -> solve J_t' ONCE at t' (invert_iters), freeze [One-shot]
+    oneshot_dps    : oneshot + DPS (z FIXED for the whole chain)             [One-shot+DPS]
     ours_legacy : w_obs -> re-solve every step (ORIGIN prior), + DPS    [Ours (prior)]
     ours        : w_obs -> re-solve J_t every step (anchor), + DPS      [Ours]
 
@@ -17,10 +17,10 @@ latent-MAP objective (no lambda/beta knobs)
     J_t(w) = softNLL(b; x0hat(X_t,t,F(w)))  +  0.5 * ||w - mu_t||^2
     mu_t   = sg[ F^{-1}( E_phi( x0hat(X_t,t,F(w_warm)) ) ) ]            (encoder anchor)
 
-They differ ONLY in HOW J is used (the paper's Encoder / Inversion / Ours split):
-    Inversion: solve J_t' ONCE at the SDEdit init (X_t', t') for invert_iters steps, freeze.
+They differ ONLY in HOW J is used (the paper's Encoder / One-shot / Ours split):
+    One-shot: solve J_t' ONCE at the SDEdit init (X_t', t') for invert_iters steps, freeze.
     OURS     : re-solve J_t at EVERY reverse step (Kw warm-started steps), w tracks X_t.
-OURS does NOT get the inversion for free: it starts from the raw encoder latent and only
+OURS does NOT get the one-shot for free: it starts from the raw encoder latent and only
 spends Kw*T per-step steps total. The comparison isolates PER-STEP REFINEMENT (tracking
 the evolving X_t) vs a single up-front solve.
 
@@ -31,8 +31,8 @@ geometry's latent instead of collapsing to the origin. beta = 1 (knob removed):
 the noise-adaptive data/prior balance already lives INSIDE softNLL via sigma_b.
 ours_legacy swaps mu_t -> 0 (same weight), an ablation of the anchor CENTER.
 
-START: every policy is seeded from w_obs. Encoder freezes it; Inversion solves once at
-t'; Ours re-solves per step. (Inversion is only computed when w_inv/winv_dps is selected.)
+START: every policy is seeded from w_obs. Encoder freezes it; One-shot solves once at
+t'; Ours re-solves per step. (One-shot is only computed when oneshot/oneshot_dps is selected.)
 
 Hierarchical output (so plot_main_grid.py can render a noise x policy grid for ANY
 subset of the policies that were run):
@@ -75,7 +75,7 @@ from core import (
 )
 from policies import (
     POLICY_REGISTRY, ALL_POLICIES, parse_policy_list, policy_label,
-    policy_color, needs_inversion, noise_tag,
+    policy_color, needs_oneshot, noise_tag,
 )
 from utils.dataset import ShapeNetCore
 from utils.misc import seed_all
@@ -109,7 +109,7 @@ def ensure_dir(path):
 
 
 # --------------------------------------------------------------------------- #
-# Latent-MAP objective J_t(w) -- shared by Inversion (solve once at t') and OURS
+# Latent-MAP objective J_t(w) -- shared by One-shot (solve once at t') and OURS
 # (re-solve every reverse step). The objective is IDENTICAL; only the solve
 # frequency differs. No lambda/beta knobs:
 #   J_t(w) = softNLL(b; x0hat(X_t,t,F(w))) + 0.5 * ANCHOR_WEIGHT * ||w - mu_t||^2
@@ -149,7 +149,7 @@ def solve_latent_map(model, x_t, b, t, w_init, n_steps, args, use_anchor=True):
 
 
 def invert_latent_anchor(model, b, x_start, start_t, w_enc, args):
-    """Inversion baseline: solve the SAME J_t' ONCE at the SDEdit init (X_t', t')."""
+    """One-shot baseline: solve the SAME J_t' ONCE at the SDEdit init (X_t', t')."""
     return solve_latent_map(model, x_start, b, start_t, w_enc, args.invert_iters, args, use_anchor=True)
 
 
@@ -175,9 +175,9 @@ def run_policy_result(key, model, b, x_start, start_t, ctx, args):
         return run_enc_chain(model, b, x_start, start_t, ctx["z_obs"], False, args)[0]
     if key == "enc_dps":
         return run_enc_chain(model, b, x_start, start_t, ctx["z_obs"], True, args)[0]
-    if key == "w_inv":
+    if key == "oneshot":
         return run_enc_chain(model, b, x_start, start_t, ctx["z_inv"], False, args)[0]
-    if key == "winv_dps":
+    if key == "oneshot_dps":
         return run_enc_chain(model, b, x_start, start_t, ctx["z_inv"], True, args)[0]
     if key == "ours_legacy":
         return run_ours_chain(model, b, x_start, start_t, ctx["w_obs"], args, "legacy")
@@ -282,7 +282,7 @@ def main():
     parser.add_argument("--reverse_noise_scale", type=float, default=0.0)
     parser.add_argument("--ours_inner_steps", type=int, default=15,
                         help="Kw: per-step warm-started Adam steps for OURS (solve J_t). "
-                             "Inversion uses --invert_iters for its single-t' solve.")
+                             "One-shot uses --invert_iters for its single-t' solve.")
     add_latent_init_args(parser)
 
     parser.add_argument("--output_dir", default="output/main_results")
@@ -300,7 +300,7 @@ def main():
         raise ValueError("--ratios must have one value per --noises (or a single value).")
 
     set_runtime_defaults(args)
-    # Inversion/OURS always use the softNLL data term + unit-precision anchor (no knobs).
+    # One-shot/OURS always use the softNLL data term + unit-precision anchor (no knobs).
     args.x_obs_loss = args.dps_loss
     seed_all(args.seed)
     model, ckpt = load_model(args)
@@ -312,10 +312,10 @@ def main():
     fig_dir = ensure_dir(os.path.join(exp_dir, "figures"))
     pol_dir = ensure_dir(os.path.join(exp_dir, "policies"))
     ref_dir = ensure_dir(os.path.join(exp_dir, "reference", "arrays"))
-    inv_needed = needs_inversion(policies)
+    oneshot_needed = needs_oneshot(policies)
 
     print("policies: %s" % ", ".join(policies))
-    print("inversion needed: %s" % inv_needed)
+    print("one-shot solve needed: %s" % oneshot_needed)
 
     ratio_of = dict(zip(args.noises, args.ratios))
     agg = OrderedDict()           # (policy, noise) -> dict(cd=[], sn=[], shapes=[])
@@ -346,11 +346,11 @@ def main():
             ctx = OrderedDict()
             ctx["z_obs"] = encode_observation_z(model, b, sample_encoder=args.encoder_sample)
             ctx["w_obs"] = z_to_w(model, ctx["z_obs"]).detach()
-            if inv_needed:
-                # Inversion = solve the SAME J_t' ONCE at the SDEdit init (X_t', t'),
+            if oneshot_needed:
+                # One-shot = solve the SAME J_t' ONCE at the SDEdit init (X_t', t'),
                 # warm-started from the encoder latent. Same objective as OURS.
-                ctx["w_inv"] = invert_latent_anchor(model, b, x_start, start_t, ctx["w_obs"], args)
-                ctx["z_inv"] = flow_to_z(model, ctx["w_inv"]).detach()
+                ctx["oneshot"] = invert_latent_anchor(model, b, x_start, start_t, ctx["w_obs"], args)
+                ctx["z_inv"] = flow_to_z(model, ctx["oneshot"]).detach()
 
             if args.save_arrays:
                 save_npz(os.path.join(ref_dir, ntag), "shape%d.npz" % idx,

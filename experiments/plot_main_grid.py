@@ -11,13 +11,13 @@ Paper-ready by default: no title, no per-cell numbers, single blue point color,
 column headers = method names, row labels = sigma_b. Numbers live in table.csv.
 
 Examples (run from project/diffusion-point-cloud):
-    # 7-column paper figure: GT | Input | Encoder | Encoder+DPS | Inversion | Inversion+DPS | Ours
+    # 7-column paper figure: GT | Input | Encoder | Encoder+DPS | One-shot | One-shot+DPS | Ours
     python experiments/plot_main_grid.py --exp_dir output/main_results \
-        --policies enc_no_dps,enc_dps,w_inv,winv_dps,ours --shape 0 --out figures/exp8_grid.pdf
+        --policies enc_no_dps,enc_dps,oneshot,oneshot_dps,ours --shape 0 --out figures/exp8_grid.pdf
     python experiments/plot_main_grid.py --exp_dir output/main_results --all_shapes
     # chair: view along x (y-z side view, upright); add --captions / --title for diagnostics
     python experiments/plot_main_grid.py --exp_dir output/main_results_chair \
-        --policies enc_no_dps,enc_dps,w_inv,winv_dps,ours --view x --all_shapes
+        --policies enc_no_dps,enc_dps,oneshot,oneshot_dps,ours --view x --all_shapes
 """
 import argparse
 import glob

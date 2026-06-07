@@ -10,8 +10,8 @@
 # Policies (--policies, default 'all'):
 #   enc_no_dps  [Encoder]        z = E_phi(b), reverse chain, no DPS
 #   enc_dps     [Encoder+DPS]    z = E_phi(b), reverse chain + DPS
-#   w_inv       [One-shot]       solve J once at t' (Kw*t_start steps), z = F(w) frozen, no DPS
-#   winv_dps    [One-shot+DPS]   one-shot latent frozen + DPS
+#   oneshot       [One-shot]       solve J once at t' (Kw*t_start steps), z = F(w) frozen, no DPS
+#   oneshot_dps    [One-shot+DPS]   one-shot latent frozen + DPS
 #   ours_legacy [Ours (prior)]   re-solve every step with origin prior (mu -> 0), then DPS
 #   ours        [Ours]           re-solve J_t every step (encoder anchor), then DPS
 #
@@ -21,7 +21,7 @@
 #
 # Output: output/main_results/{result.json, table.csv, policies/<key>/..., figures/}
 # Then render the qualitative grid (paper Fig. 2):
-#   python experiments/plot_main_grid.py --exp_dir output/main_results --policies ours,winv_dps,enc_dps
+#   python experiments/plot_main_grid.py --exp_dir output/main_results --policies ours,oneshot_dps,enc_dps
 #
 # Run from src/ (the parent of this script's directory).
 set -euo pipefail
@@ -60,4 +60,4 @@ python experiments/run_main_results.py \
   --output_dir "${EXP_DIR}"
 
 echo "DONE main results (${CATEGORY}, Kw=${KW}) -> ${EXP_DIR}"
-echo "Grid (Fig. 2): python experiments/plot_main_grid.py --exp_dir ${EXP_DIR} --policies ours,winv_dps,enc_dps"
+echo "Grid (Fig. 2): python experiments/plot_main_grid.py --exp_dir ${EXP_DIR} --policies ours,oneshot_dps,enc_dps"

@@ -96,8 +96,8 @@ on/off) plus our method:
 |---------------|----------------|----------------------------------------------------|-----|
 | `enc_no_dps`  | Encoder        | $w = F_\alpha^{-1}(E_\phi(b))$, frozen             | no  |
 | `enc_dps`     | Encoder+DPS    | encoder latent, frozen                             | yes |
-| `w_inv`       | One-shot       | solve $J_t$ once at $t'$ ($K_w t'$ steps), frozen  | no  |
-| `winv_dps`    | One-shot+DPS   | one-shot latent, frozen                            | yes |
+| `oneshot`       | One-shot       | solve $J_t$ once at $t'$ ($K_w t'$ steps), frozen  | no  |
+| `oneshot_dps`    | One-shot+DPS   | one-shot latent, frozen                            | yes |
 | `ours`        | **Ours**       | **re-solve $J_t$ at every reverse step** ($K_w$ each) | yes |
 
 All policies seed from the encoder latent $w_{\mathrm{obs}}$. **One-shot is
@@ -108,7 +108,7 @@ Ours gap isolates *when* the latent is optimized.
 Then render the qualitative grid (Fig. 1):
 
 ```bash
-python experiments/plot_main_grid.py --exp_dir output/main_results --policies ours,winv_dps,enc_dps
+python experiments/plot_main_grid.py --exp_dir output/main_results --policies ours,oneshot_dps,enc_dps
 ```
 
 Defaults reproduce the paper: airplane, $K_w=25$, $t'=30$, noise $\{0.1,0.2,0.3\}$,

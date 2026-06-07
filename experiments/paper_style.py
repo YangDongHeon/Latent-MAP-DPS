@@ -20,8 +20,8 @@ PALETTE = {
 POLICY_COLORS = {
     "enc_no_dps":  "#B8C0CC",
     "enc_dps":     "#6BAED6",
-    "w_inv":       "#F4A259",
-    "winv_dps":    "#E07B39",
+    "oneshot":       "#F4A259",
+    "oneshot_dps":    "#E07B39",
     "ours_legacy": "#9E78B5",
     "ours":        "#2166AC",
 }

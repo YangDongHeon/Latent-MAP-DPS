@@ -145,8 +145,8 @@ def main():
 
             z_obs = encode_observation_z(model, b, sample_encoder=args.encoder_sample)
             w_obs = z_to_w(model, z_obs).detach()
-            # Shared init: single-t' anchor inversion (identical to exp8). Both OURS and
-            # the one-shot Inversion+DPS baseline start here -> coincide at the first step.
+            # Shared init: single-t' anchor one-shot (identical to exp8). Both OURS and
+            # the one-shot One-shot+DPS baseline start here -> coincide at the first step.
             # OURS: from the raw encoder latent, re-solve J at every reverse step.
             w_at = run_ours_capture(model, b, x_start, st, w_obs, args)
             # One-shot @ Kw: exactly OURS' first-step solve (Kw steps @ t' from w_obs), frozen

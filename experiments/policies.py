@@ -8,17 +8,17 @@ All latent policies start from the SAME encoder latent w_obs=E_phi(b) and use th
 IDENTICAL latent-MAP objective (no lambda/beta knobs)
     J_t(w) = softNLL(b; x0hat(X_t,t,F(w))) + 0.5*||w - mu_t||^2,
     mu_t = sg[F^{-1}(E_phi(x0hat(X_t,t,F(w_warm))))]   (encoder-consistency anchor).
-They differ ONLY in HOW J is used (this is the paper's Encoder / Inversion / Ours split):
+They differ ONLY in HOW J is used (this is the paper's Encoder / One-shot / Ours split):
     Encoder   : no latent optimization (w = w_obs, frozen).
-    Inversion : solve J ONCE at t' (invert_iters steps), then freeze.
+    One-shot : solve J ONCE at t' (invert_iters steps), then freeze.
     Ours      : re-solve J at EVERY reverse step (Kw warm-started steps), w tracks X_t.
-So Ours and Inversion both start at w_obs and optimize the same J; the ONLY difference
-is one-shot-at-t' vs per-step. Ours does NOT get the inversion for free.
+So Ours and One-shot both start at w_obs and optimize the same J; the ONLY difference
+is one-shot-at-t' vs per-step. Ours does NOT get the one-shot for free.
 
 Each policy entry:
     label   : paper-figure column title
-    start   : initial latent -- always 'encoder' (w_obs); 'inversion' marks the
-              one-shot t' solve baselines (w_inv = invert_iters-step solve from w_obs)
+    start   : initial latent -- always 'encoder' (w_obs); 'one-shot' marks the
+              one-shot t' solve baselines (oneshot = invert_iters-step solve from w_obs)
     refine  : per-step latent update -- None (freeze) | 'anchor' (re-solve J_t with
               the encoder anchor mu_t) | 'legacy' (re-solve with the ORIGIN prior
               mu_t->0, same weight -- an ablation of the anchor CENTER)
@@ -31,8 +31,8 @@ from collections import OrderedDict
 POLICY_REGISTRY = OrderedDict([
     ("enc_no_dps",  dict(label="Encoder",        start="encoder",   refine=None,     dps=False, color="#B8C0CC")),
     ("enc_dps",     dict(label="Encoder+DPS",    start="encoder",   refine=None,     dps=True,  color="#6BAED6")),
-    ("w_inv",       dict(label="One-shot",       start="inversion", refine=None,     dps=False, color="#F4A259")),
-    ("winv_dps",    dict(label="One-shot+DPS",   start="inversion", refine=None,     dps=True,  color="#E07B39")),
+    ("oneshot",       dict(label="One-shot",       start="oneshot", refine=None,     dps=False, color="#F4A259")),
+    ("oneshot_dps",    dict(label="One-shot+DPS",   start="oneshot", refine=None,     dps=True,  color="#E07B39")),
     ("ours_legacy", dict(label="Ours (prior)",   start="encoder",   refine="legacy", dps=True,  color="#9E78B5")),
     ("ours",        dict(label="Ours",           start="encoder",   refine="anchor", dps=True,  color="#2166AC")),
 ])
@@ -59,8 +59,8 @@ def policy_color(key):
     return POLICY_REGISTRY[key]["color"]
 
 
-def needs_inversion(keys):
-    return any(POLICY_REGISTRY[k]["start"] == "inversion" for k in keys)
+def needs_oneshot(keys):
+    return any(POLICY_REGISTRY[k]["start"] == "oneshot" for k in keys)
 
 
 def noise_tag(noise):
