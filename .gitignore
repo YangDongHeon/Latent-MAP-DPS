@@ -1,0 +1,26 @@
+# data / checkpoints
+data/
+pretrained/
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+
+# outputs
+output/
+outputs/
+*.log
+
+# python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# env / editor
+.env
+.venv/
+.vscode/
+.idea/
+
+# OS
+.DS_Store

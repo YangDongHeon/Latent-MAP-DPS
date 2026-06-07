@@ -1,0 +1,147 @@
+# Latent-MAP DPS
+
+**Latent-MAP Posterior Sampling for Training-Free Point-Cloud Inverse Problems**
+
+Training-free posterior sampling for point-cloud inverse problems under a
+**frozen, latent-conditioned** point-cloud diffusion prior. Such priors expose
+only a *conditional* score for a fixed global shape latent `w`, not the
+marginal score that diffusion posterior sampling (DPS) assumes. Latent-MAP DPS
+derives the latent-marginal posterior score, approximates its time-dependent
+latent posterior by a **per-step MAP estimate** (anchored to the prior's own
+encoder, no added learned parameters), and combines it with DPS guidance under
+an SDEdit-style initialization. The prior is never retrained.
+
+At every reverse step the shape latent `w` is re-solved on
+
+```
+J_t(w) = softNLL(b; x0hat(X_t, t, F(w)))  +  0.5 * || w - mu_t ||^2
+mu_t   = sg[ F^{-1}(E_phi(x0hat)) ]        (encoder-consistency anchor)
+```
+
+and the points are updated with the resulting measurement-guided posterior
+score. Evaluated here on ShapeNet airplane Gaussian denoising.
+
+> Built on the latent point-cloud diffusion prior of Luo & Hu, *Diffusion
+> Probabilistic Models for 3D Point Cloud Generation* (CVPR 2021),
+> <https://github.com/luost26/diffusion-point-cloud>. The model code under
+> `models/` and the data loader under `utils/` derive from that project; see
+> `LICENSE`.
+
+## Repository layout
+
+```
+src/
+├── models/                 # frozen latent point-cloud diffusion prior (FlowVAE)
+│   ├── vae_flow.py         #   encoder E_phi + flow F_alpha + latent-cond. diffusion
+│   ├── diffusion.py  flow.py  common.py
+│   └── encoders/           #   PointNet encoder
+├── utils/
+│   ├── dataset.py          # ShapeNetCore loader (HDF5)
+│   └── misc.py             # seed_all, helpers
+├── experiments/
+│   ├── core.py             # shared sampler library (model loading, DPS step,
+│   │                       #   Tweedie x0hat, soft-NLL, encode/decode helpers, metrics)
+│   ├── policies.py         # baseline/ablation registry (Encoder, One-shot, Ours, ...)
+│   ├── paper_style.py      # matplotlib style for the paper figures
+│   ├── run_main_results.py # Experiment 1: Table 1 (all policies, all noise levels)
+│   ├── run_main_results.sh
+│   ├── run_mechanism.py    # Experiment 2: Fig. 3 (latent-quality vs reverse step)
+│   ├── run_mechanism.sh
+│   ├── plot_main_grid.py   # renders the qualitative grid (Fig. 2)
+│   └── plot_mechanism.py   # renders the mechanism plot (Fig. 3)
+├── pretrained/             # place GEN_airplane.pt here (not tracked)
+├── data/                   # place shapenet.hdf5 here (not tracked)
+├── output/                 # experiment outputs (created at run time, not tracked)
+├── env.yml                 # conda environment
+└── LICENSE
+```
+
+## Setup
+
+```bash
+conda env create -f env.yml      # creates env "dpm-pc-gen" (PyTorch + h5py + matplotlib)
+conda activate dpm-pc-gen
+```
+
+Download the pretrained generator and the ShapeNet HDF5 from the base project's
+drive (<https://drive.google.com/drive/folders/1Su0hCuGFo1AGrNb_VMNnlF7qeQwKjfhZ>)
+and place them as:
+
+```
+src/pretrained/GEN_airplane.pt
+src/data/shapenet.hdf5
+```
+
+All commands below are run **from `src/`**.
+
+## Reproduce the paper
+
+### Experiment 1 — main results (Table 1 + Fig. 2)
+
+```bash
+bash experiments/run_main_results.sh
+# -> output/main_results/{table.csv, result.json, policies/<key>/..., figures/}
+```
+
+Runs the ablation ladder along two axes (how the latent is obtained × DPS
+on/off) plus our method:
+
+| key           | label          | latent                                             | DPS |
+|---------------|----------------|----------------------------------------------------|-----|
+| `enc_no_dps`  | Encoder        | `w = F^{-1}(E_phi(b))`, frozen                     | no  |
+| `enc_dps`     | Encoder+DPS    | encoder latent, frozen                             | yes |
+| `w_inv`       | One-shot       | solve `J` once at `t'` (`Kw·t'` steps), frozen     | no  |
+| `winv_dps`    | One-shot+DPS   | one-shot latent, frozen                            | yes |
+| `ours`        | **Ours**       | **re-solve `J` at every reverse step** (`Kw` each) | yes |
+
+All policies seed from the encoder latent `w_obs`. **One-shot is
+budget-matched to Ours**: it spends the same total number of optimization steps
+(`Kw·t'`), but all at once at `t'` and then freezes — so the One-shot+DPS vs
+Ours gap isolates *when* the latent is optimized.
+
+Then render the qualitative grid (Fig. 2):
+
+```bash
+python experiments/plot_main_grid.py --exp_dir output/main_results --policies ours,winv_dps,enc_dps
+```
+
+Defaults reproduce the paper: airplane, `Kw=25`, `t'=30`, noise `{0.1,0.2,0.3}`,
+**10-shape subset**. For the full airplane test set:
+
+```bash
+NUM_SHAPES=0 bash experiments/run_main_results.sh
+```
+
+### Experiment 2 — mechanism (Fig. 3)
+
+```bash
+bash experiments/run_mechanism.sh
+python experiments/plot_mechanism.py --exp_dir output/mechanism
+# -> output/mechanism/{result.json, figures/exp10_latent_vs_step_noise*.png}
+```
+
+At every few reverse steps the current latent is **decoded independently to
+completion** (a full latent-conditioned generation, not the running reverse
+state) and scored by CD-to-GT — i.e. how representative the latent is. Ours'
+latent starts worse but improves along the chain and crosses the frozen
+one-shot latents.
+
+## Key knobs
+
+| flag                  | meaning                                            | default |
+|-----------------------|----------------------------------------------------|---------|
+| `--ours_inner_steps`  | `Kw`, latent gradient steps per reverse step       | 25      |
+| `--t_start`           | `t'`, SDEdit start step (of `T=100`)               | 30      |
+| `--invert_iters`      | one-shot budget (set to `Kw·t'` to budget-match)   | 750     |
+| `--noises`            | observation noise levels `sigma_b`                 | 0.1,0.2,0.3 |
+| `--num_shapes`        | test shapes (`0` = full set)                       | 10      |
+
+The latent objective is parameter-free: the soft-NLL already carries `sigma_b`
+and the latent posterior is unit-variance, so the two terms combine with weight
+1 (no `lambda`/`beta`). The reverse-step DPS guidance keeps a step size `zeta_t`
+(the `--ratios` schedule), the standard DPS hyperparameter.
+
+## Citation
+
+If you use the underlying prior, please cite Luo & Hu (CVPR 2021). This
+repository implements Latent-MAP DPS on top of it.
