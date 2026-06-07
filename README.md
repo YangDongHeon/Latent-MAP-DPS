@@ -4,19 +4,27 @@
 
 Training-free posterior sampling for point-cloud inverse problems under a
 **frozen, latent-conditioned** point-cloud diffusion prior. Such priors expose
-only a *conditional* score for a fixed global shape latent `w`, not the
+only a *conditional* score for a fixed global shape latent $w$, not the
 marginal score that diffusion posterior sampling (DPS) assumes. Latent-MAP DPS
 derives the latent-marginal posterior score, approximates its time-dependent
 latent posterior by a **per-step MAP estimate** (anchored to the prior's own
 encoder, no added learned parameters), and combines it with DPS guidance under
 an SDEdit-style initialization. The prior is never retrained.
 
-At every reverse step the shape latent `w` is re-solved on
+At every reverse step the shape latent $w$ is re-solved on
 
-```
-J_t(w) = softNLL(b; x0hat(X_t, t, F(w)))  +  0.5 * || w - mu_t ||^2
-mu_t   = sg[ F^{-1}(E_phi(x0hat)) ]        (encoder-consistency anchor)
-```
+$$
+\begin{aligned}
+J_t(w)
+&= \operatorname{softNLL}\!\left(b;\hat{x}_0\!\left(X_t,t,F_\alpha(w)\right)\right)
+   + \frac{1}{2}\left\lVert w-\mu_t\right\rVert_2^2, \\
+\mu_t
+&= \operatorname{sg}\!\left[
+F_\alpha^{-1}\!\left(E_\phi(\hat{x}_0)\right)
+\right]
+\qquad\text{(encoder-consistency anchor).}
+\end{aligned}
+$$
 
 and the points are updated with the resulting measurement-guided posterior
 score. Evaluated here on ShapeNet airplane Gaussian denoising.
@@ -32,7 +40,7 @@ score. Evaluated here on ShapeNet airplane Gaussian denoising.
 ```
 src/
 ├── models/                 # frozen latent point-cloud diffusion prior (FlowVAE)
-│   ├── vae_flow.py         #   encoder E_phi + flow F_alpha + latent-cond. diffusion
+│   ├── vae_flow.py         #   encoder, flow, latent-cond. diffusion
 │   ├── diffusion.py  flow.py  common.py
 │   └── encoders/           #   PointNet encoder
 ├── utils/
@@ -40,7 +48,7 @@ src/
 │   └── misc.py             # seed_all, helpers
 ├── experiments/
 │   ├── core.py             # shared sampler library (model loading, DPS step,
-│   │                       #   Tweedie x0hat, soft-NLL, encode/decode helpers, metrics)
+│   │                       #   Tweedie estimate, soft-NLL, encode/decode helpers, metrics)
 │   ├── policies.py         # baseline/ablation registry (Encoder, One-shot, Ours, ...)
 │   ├── paper_style.py      # matplotlib style for the paper figures
 │   ├── run_main_results.py # Experiment 1: Table 1 (all policies, all noise levels)
@@ -88,15 +96,15 @@ on/off) plus our method:
 
 | key           | label          | latent                                             | DPS |
 |---------------|----------------|----------------------------------------------------|-----|
-| `enc_no_dps`  | Encoder        | `w = F^{-1}(E_phi(b))`, frozen                     | no  |
+| `enc_no_dps`  | Encoder        | $w = F_\alpha^{-1}(E_\phi(b))$, frozen             | no  |
 | `enc_dps`     | Encoder+DPS    | encoder latent, frozen                             | yes |
-| `w_inv`       | One-shot       | solve `J` once at `t'` (`Kw·t'` steps), frozen     | no  |
+| `w_inv`       | One-shot       | solve $J_t$ once at $t'$ ($K_w t'$ steps), frozen  | no  |
 | `winv_dps`    | One-shot+DPS   | one-shot latent, frozen                            | yes |
-| `ours`        | **Ours**       | **re-solve `J` at every reverse step** (`Kw` each) | yes |
+| `ours`        | **Ours**       | **re-solve $J_t$ at every reverse step** ($K_w$ each) | yes |
 
-All policies seed from the encoder latent `w_obs`. **One-shot is
+All policies seed from the encoder latent $w_{\mathrm{obs}}$. **One-shot is
 budget-matched to Ours**: it spends the same total number of optimization steps
-(`Kw·t'`), but all at once at `t'` and then freezes — so the One-shot+DPS vs
+$K_w t'$, but all at once at $t'$ and then freezes — so the One-shot+DPS vs
 Ours gap isolates *when* the latent is optimized.
 
 Then render the qualitative grid (Fig. 2):
@@ -105,7 +113,7 @@ Then render the qualitative grid (Fig. 2):
 python experiments/plot_main_grid.py --exp_dir output/main_results --policies ours,winv_dps,enc_dps
 ```
 
-Defaults reproduce the paper: airplane, `Kw=25`, `t'=30`, noise `{0.1,0.2,0.3}`,
+Defaults reproduce the paper: airplane, $K_w=25$, $t'=30$, noise $\{0.1,0.2,0.3\}$,
 **10-shape subset**. For the full airplane test set:
 
 ```bash
@@ -130,15 +138,15 @@ one-shot latents.
 
 | flag                  | meaning                                            | default |
 |-----------------------|----------------------------------------------------|---------|
-| `--ours_inner_steps`  | `Kw`, latent gradient steps per reverse step       | 25      |
-| `--t_start`           | `t'`, SDEdit start step (of `T=100`)               | 30      |
-| `--invert_iters`      | one-shot budget (set to `Kw·t'` to budget-match)   | 750     |
-| `--noises`            | observation noise levels `sigma_b`                 | 0.1,0.2,0.3 |
+| `--ours_inner_steps`  | $K_w$, latent gradient steps per reverse step      | 25      |
+| `--t_start`           | $t'$, SDEdit start step (of $T=100$)               | 30      |
+| `--invert_iters`      | one-shot budget (set to $K_w t'$ to budget-match)  | 750     |
+| `--noises`            | observation noise levels $\sigma_b$                | 0.1,0.2,0.3 |
 | `--num_shapes`        | test shapes (`0` = full set)                       | 10      |
 
-The latent objective is parameter-free: the soft-NLL already carries `sigma_b`
+The latent objective is parameter-free: the soft-NLL already carries $\sigma_b$
 and the latent posterior is unit-variance, so the two terms combine with weight
-1 (no `lambda`/`beta`). The reverse-step DPS guidance keeps a step size `zeta_t`
+1 (no $\lambda/\beta$). The reverse-step DPS guidance keeps a step size $\zeta_t$
 (the `--ratios` schedule), the standard DPS hyperparameter.
 
 ## Citation
