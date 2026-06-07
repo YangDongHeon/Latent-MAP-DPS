@@ -14,16 +14,13 @@ an SDEdit-style initialization. The prior is never retrained.
 At every reverse step the shape latent $w$ is re-solved on
 
 $$
-\begin{aligned}
-J_t(w)
-&= \operatorname{softNLL}\!\left(b;\hat{x}_0\!\left(X_t,t,F_\alpha(w)\right)\right)
-   + \frac{1}{2}\left\lVert w-\mu_t\right\rVert_2^2, \\
-\mu_t
-&= \operatorname{sg}\!\left[
-F_\alpha^{-1}\!\left(E_\phi(\hat{x}_0)\right)
-\right]
-\qquad\text{(encoder-consistency anchor).}
-\end{aligned}
+J_t(w) = \mathrm{softNLL}(b; \hat{x}_0(X_t,t,F_\alpha(w)))
++ \frac{1}{2}\|w - \mu_t\|_2^2
+$$
+
+$$
+\mu_t = \mathrm{sg}[F_\alpha^{-1}(E_\phi(\hat{x}_0))]
+\quad \text{(encoder-consistency anchor)}
 $$
 
 and the points are updated with the resulting measurement-guided posterior
